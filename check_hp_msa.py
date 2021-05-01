@@ -47,13 +47,33 @@ STATES = {
 }
 
 
+def worst_state(*states):
+    overall = -1
+
+    for state in states:
+        if state == CRITICAL:
+            overall = CRITICAL
+        elif state == UNKNOWN:
+            if overall != CRITICAL:
+                overall = UNKNOWN
+        elif state > overall:
+            overall = state
+
+    if overall < 0 or overall > 3:
+        overall = UNKNOWN
+
+    return overall
+
+def getPct(usage, size):
+    return round((100/float(size) * float(usage)),2)
+
+
 class CriticalException(Exception):
     """
     Provide an exception that will cause the check to exit critically with an error
     """
 
     pass
-
 
 class Client:
     """
@@ -74,8 +94,8 @@ class Client:
         self.insecure = insecure
 
         # TODO: allow debug output
-        #self.debug_outdir = 'tmp/'
-        self.debug_outdir = None
+        self.debug_outdir = 'tmp/'
+        #self.debug_outdir = None
 
         if insecure:
             self.session.verify = not insecure
@@ -164,13 +184,20 @@ class Client:
         except Exception as e:
             raise CriticalException('Could not decode API XML: ' + str(e))
 
-
-    def get_component(self, class_type, name, api_type):
+    def get_component(self, name, api_type, outputList, perfDataList=None):
         """
         GET and initialize a class with a certain type
         """
         xml, response = self.request('show/' + name)
         status = self.get_response_status(xml)
+
+        # TODO: debug response in file
+        if self.debug_outdir is not None:
+            if not os.path.isdir(self.debug_outdir):
+                os.mkdir(self.debug_outdir)
+
+            with open(os.path.join(self.debug_outdir, "show-%s.xml" % name), 'w') as fh:
+                fh.write(response.text)
 
         objects = []
 
@@ -182,20 +209,11 @@ class Client:
             if base_type == 'status':
                 continue
 
-            assert base_type == api_type
-
             objects.append(ApiObject(child))
 
-        # TODO: debug response in file
-        if self.debug_outdir is not None:
-            if not os.path.isdir(self.debug_outdir):
-                os.mkdir(self.debug_outdir)
 
-            with open(os.path.join(self.debug_outdir, "show-%s.xml" % name), 'w') as fh:
-                fh.write(response.text)
 
-        return class_type(objects)
-
+        return CheckResult(objects,name, outputList, perfDataList)
 
 class ApiObject:
     def __init__(self, element):
@@ -229,16 +247,17 @@ class ApiObject:
 
             self.properties[child.attrib['name']] = value
 
-
 class CheckResult:
-    def __init__(self):
+    def __init__(self, objects, objectName, outputList, perfDataList=None):
+        super().__init__()
+        self.objects = objects
         self.state = -1
         self.summary = []
         self.output = []
         self.perfdata = []
-
-    def build_output(self):
-        raise NotImplemented("build_output not implemented in %s" % type(self))
+        self.objectName = objectName
+        self.outputList = outputList
+        self.perfDataList = perfDataList
 
     def get_output(self):
         if len(self.summary) == 0:
@@ -259,9 +278,6 @@ class CheckResult:
 
         return "[%s] " % state + output
 
-    def build_status(self):
-        raise NotImplemented("build_status not implemented in %s" % type(self))
-
     def get_status(self):
         if self.state < 0:
             self.build_status()
@@ -274,29 +290,19 @@ class CheckResult:
         print(self.get_output())
         return self.get_status()
 
-
-class Disks(CheckResult):
-    """
-    See API Documentation: TODO
-    """
-
-    def __init__(self, objects):
-        super().__init__()
-        self.objects = objects
-
     def build_output(self):
         states = {
-            'disks': 0,
+            'objectctn': 0,
             'unhealthy': 0,
         }
 
-        for disk in self.objects:
-            p = disk.properties
+        for obj in self.objects:
+            p = obj.properties
 
-            states['disks'] += 1
+            states['objectctn'] += 1
 
             # States
-            if p['health'] != "OK" or p['error'] != 0:
+            if p['health'] != "OK":
                 states['unhealthy'] += 1
 
             # Build health summary
@@ -305,43 +311,42 @@ class Disks(CheckResult):
                 health += " (%s)" % p['health-reason']
             if p['health-recommendation']:
                 health += " (%s)" % p['health-recommendation']
-            if p['error'] != 0:
-                health += " (error flag)"
-            if p['temperature-status'] != 'OK':
-                health += " - temperature %s %s" % (p['temperature-status'], p['temperature'])
-
-            self.output.append("[%s] %s %s %s %s %s %s" % (
-                p['location'].ljust(4, ' '),
-                p['vendor'],
-                p['model'],
-                p['size'],
-                p['serial-number'],
-                p['status'],
-                health,
-            ))
-
-            label = p['location'].replace('.', '_')
-
-            self.perfdata.append("disk_%s_temperature=%s" % (label, p['temperature-numeric']))
+            
+            # Handling output
+            outputLine=f"[{health}]" 
+            for output in self.outputList:
+                outputLine+=f" {p[output]}"
+            self.output.append(outputLine)
+           
+            # Handling PerfData
+            if self.perfDataList is not None:   
+                for perfDataLine in self.perfDataList:
+                    if isinstance(perfDataLine, str):
+                        self.perfdata.append(f"{self.objectName}_{perfDataLine}={p[perfDataLine]}")
+                    elif isinstance(perfDataLine, list):
+                        usage=perfDataLine[0]
+                        total=perfDataLine[1]
+                        name=perfDataLine[2]
+                        pct=getPct(p[usage],p[total])
+                        self.perfdata.append(f"{self.objectName}_pct_{name}={pct}")
+                    else:
+                        raise NotImplemented("handling performance data of type {type(perfDataLine)} is not implemented")
 
         for state in states:
             if states[state] != 0:
-                self.summary.append("%d %s" % (states[state], state))
+                self.summary.append("%d %s" % (states[state], str(self.objectName)))
 
         if len(self.summary) == 0:
-            self.summary = ["no disks"]
-
+            self.summary = [f"no {objectName}"]
 
     def build_status(self):
         states = []
 
-        for disk in self.objects:
-            p = disk.properties
+        for obj in self.objects:
+            p = obj.properties
 
-            if p['health'] != "OK" or p['error'] != 0:
+            if p['health'] != "OK":
                 states.append(CRITICAL)
-            elif p['temperature-status'] != 'OK':
-                states.append(WARNING)
             else:
                 states.append(OK)
 
@@ -351,25 +356,6 @@ class Disks(CheckResult):
             self.state = OK
         else:
             self.state = worst_state(*states)
-
-
-def worst_state(*states):
-    overall = -1
-
-    for state in states:
-        if state == CRITICAL:
-            overall = CRITICAL
-        elif state == UNKNOWN:
-            if overall != CRITICAL:
-                overall = UNKNOWN
-        elif state > overall:
-            overall = state
-
-    if overall < 0 or overall > 3:
-        overall = UNKNOWN
-
-    return overall
-
 
 def parse_args():
     args = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
@@ -403,7 +389,41 @@ def main():
     mode = None
 
     if args.mode == 'disks':
-        mode = client.get_component(Disks, "disks", "drives")
+        output=['location','vendor','model','size','serial-number','status']
+        mode = client.kget_component( "disks", "drives",output)
+
+    elif args.mode == 'volumes': 
+        output=['volume-name','volume-type','capabilities','size','serial-number']
+        perfdata=[
+            ['allocated-size-numeric','total-size-numeric','allocation'],
+            'allocated-size'
+        ]
+        mode = client.kget_component("volumes","volumes",output,perfdata)
+
+    elif args.mode == 'enclosures':
+        output=['durable-id','type','board-model','slots','status']
+        perfdata=[
+            ['number-of-disks','slots','diskallocation']
+        ]
+        mode = client.get_component("enclosures", "enclosures",output,perfdata)
+
+    elif args.mode == 'ports':
+        output=['port','port-type','media','actual-speed','status']
+        perfdata=[
+            ['configured-speed-numeric','actual-speed-numeric','speedallocation']
+        ]
+        mode = client.get_component("ports", "port",output,perfdata)   
+
+    elif args.mode == 'fans':
+        output=['name','location','status-ses','status']
+        perfdata=[
+            'speed'
+        ]
+        mode = client.get_component("fans", "fan-details",output,perfdata)   
+    
+    elif args.mode == 'controllers':
+        output=['durable-id','ip-address','disks','description','status']
+        mode = client.get_component("controllers", "controllers",output)   
     else:
         print("[UNKNOWN] unknown mode %s" % args.mode)
         return UNKNOWN
