@@ -101,6 +101,7 @@ class Client:
             self.session.verify = not insecure
 
             import urllib3
+            requests.packages.urllib3.disable_warnings()
             urllib3.disable_warnings()
 
         if logger is None:
