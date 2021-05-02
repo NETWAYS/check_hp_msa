@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Icinga check plugin for HP MSA storages
 
@@ -390,7 +390,7 @@ def main():
 
     if args.mode == 'disks':
         output=['location','vendor','model','size','serial-number','status']
-        mode = client.kget_component( "disks", "drives",output)
+        mode = client.get_component( "disks", "drives",output)
 
     elif args.mode == 'volumes': 
         output=['volume-name','volume-type','capabilities','size','serial-number']
@@ -398,7 +398,7 @@ def main():
             ['allocated-size-numeric','total-size-numeric','allocation'],
             'allocated-size'
         ]
-        mode = client.kget_component("volumes","volumes",output,perfdata)
+        mode = client.get_component("volumes","volumes",output,perfdata)
 
     elif args.mode == 'enclosures':
         output=['durable-id','type','board-model','slots','status']
