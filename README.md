@@ -1,12 +1,8 @@
-# check_hp_msa
-
-Icinga check plugin for HP MSA storages
-
 **Warning:** This is a prototype and not finished and not very well tested.
 
-TODO
+# check_hp_msa
 
-Inspired by [Zabbix HPMSA Integration](https://github.com/asand3r/zbx-hpmsa).
+Icinga check plugin for HP MSA storages. Inspired by [Zabbix HPMSA Integration](https://github.com/asand3r/zbx-hpmsa).
 
 ## Installation
 
