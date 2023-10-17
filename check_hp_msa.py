@@ -388,7 +388,7 @@ def parse_args():
     args.add_argument('--insecure', help='Do not check certificates', action='store_true')
 
     args.add_argument('--version', '-V', help='Print version', action='store_true')
-    args.add_argument('--authentication_hash_algo',
+    args.add_argument('--auth_hash_type',
                       help='The Hash algorithm to use for the authentication procedure ',
                       required=False,
                       choices=['md5', 'sha256'])
@@ -405,7 +405,7 @@ def main():
 
     client = Client(args.api, args.username, args.password, insecure=args.insecure)
 
-    client.login(args.authentication_hash_algo)
+    client.login(args.auth_hash_type)
 
     mode = None
 
