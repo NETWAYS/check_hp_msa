@@ -388,8 +388,8 @@ def parse_args():
     args.add_argument('--insecure', help='Do not check certificates', action='store_true')
 
     args.add_argument('--version', '-V', help='Print version', action='store_true')
-    args.add_argument('--auth_hash_type',
-                      help='The Hash algorithm to use for the authentication procedure ',
+    args.add_argument('--auth-hash-type',
+                      help='The hash algorithm to use for the authentication procedure',
                       required=False,
                       choices=['md5', 'sha256'])
 
