@@ -4,9 +4,14 @@
 
 Icinga check plugin for HP MSA storages. Inspired by [Zabbix HPMSA Integration](https://github.com/asand3r/zbx-hpmsa).
 
+
 ## Installation
 
-Python 3 is required, and you need the Python [requests](https://pypi.org/project/requests/) module.
+The plugin requires at least Python 3.
+
+Python dependencies:
+
+* `requests`
 
 Please prefer installation via system packages like `python3-requests`.
 
@@ -14,7 +19,7 @@ Alternatively you can install with pip:
 
     pip3 install requests
 
-Make sure to modify the shebang to your environment, one of the following should be fine.
+Make sure to modify the shebang to your environment, one of the following should be fine:
 
     #!/usr/bin/env python3
     #!/usr/bin/python3
@@ -24,20 +29,26 @@ Then copy the file to your plugin dir:
     cp check_hp_msa.py /usr/lib*/nagios/plugins/check_hp_msa
     chmod 755 /usr/lib*/nagios/plugins/check_hp_msa
 
-<!--
-Also see the [Icinga 2 example command](icinga2/command.conf).
--->
-
 ## Usage
 
-```
-$ ./check_hp_msa.py --help
-...
-TODO
+```bash
+check_hp_msa.py --help
+
+-h, --help            show this help message and exit
+--api API, -A API     HP MSA host url (e.g. https://msa1.local)
+--username USERNAME, -u USERNAME
+                      Username for login
+--password PASSWORD, -p PASSWORD
+                      Password for login
+--mode MODE, -m MODE  Check mode
+--insecure            Do not check certificates
+--version, -V         Print version
+--auth-hash-type {md5,sha256}
+                      The Hash algorithm to use for the authentication procedure
 ```
 
-```
-$ ./check_hp_msa.py --api 'https://msa.local' -u icinga -p password --mode disks
+```bash
+check_hp_msa.py --api 'https://msa.local' -u icinga -p password --mode disks
 [OK] 82 disks
 
 [1.1 ] SEAGATE ST10000NM002G 10.0TB SERIALNO Up OK
