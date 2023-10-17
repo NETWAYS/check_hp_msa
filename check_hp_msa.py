@@ -22,15 +22,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import argparse
+import hashlib
+import logging
 import os
 import sys
-import argparse
-import logging
-import requests
-import hashlib
 from xml.etree import ElementTree
 from urllib.parse import urljoin
 
+import requests
 
 VERSION = '0.1.0'
 
@@ -51,9 +51,6 @@ class CriticalException(Exception):
     """
     Provide an exception that will cause the check to exit critically with an error
     """
-
-    pass
-
 
 class Client:
     """
@@ -94,26 +91,27 @@ class Client:
         """
         cred = "%s_%s" % (self.username, self.password)
 
+        # pylint: disable=no-else-return
         if hash_type is None or hash_type == "md5":
             return hashlib.md5(cred.encode()).hexdigest()
         elif hash_type == "sha256":
             return hashlib.sha256(cred.encode()).hexdigest()
-        else:
-            raise
+
+        raise Exception
 
     def login(self, hash_type):
         try:
             cred = self.credential_hash(hash_type)
-            xml, response = self.request('login/'+cred)
+            xml, _ = self.request('login/'+cred)
 
-            responseType, responseText = self.get_response_status(xml)
+            _, responseText = self.get_response_status(xml)
 
             # TODO: we either receive sessionkey in responseText or a cookie in newer API releases
             # both should be supported
             self.session_key = responseText
 
         except Exception as e:
-            raise CriticalException('login failed: ' + str(e))
+            raise CriticalException('login failed: ' + str(e)) from e
 
 
     def get_response_status(self, xml):
@@ -127,7 +125,7 @@ class Client:
         responseType = status.find("./PROPERTY[@name='response-type']").text
         responseText = status.find("./PROPERTY[@name='response']").text
 
-        self.logger.debug('XML response: %s - %s' % (responseType, responseText))
+        self.logger.debug('XML response: %s - %s', responseType, responseText)
 
         if responseType != "Success":
             raise Exception("%s: %s" % (responseType, responseText))
@@ -135,7 +133,7 @@ class Client:
         return responseType, responseText
 
 
-    def request(self, url, method='GET', **kwargs):
+    def request(self, url, method='GET', **kwargs): # pylint: disable=unused-argument
         """
         Basic XML API request handling
 
@@ -155,17 +153,15 @@ class Client:
 
             response = self.session.request(method, request_url, headers=headers)
         except requests.exceptions.RequestException as e:
-            raise CriticalException(e)
+            raise CriticalException(e) from e
 
         if response.status_code != 200:
             raise CriticalException('Request to %s was not successful: %s' % (request_url, response.status_code))
 
         try:
-            # debug:
-            # print(response.text)
             return ElementTree.fromstring(response.text), response
         except Exception as e:
-            raise CriticalException('Could not decode API XML: ' + str(e))
+            raise CriticalException('Could not decode API XML: ' + str(e)) from e
 
 
     def get_component(self, class_type, name, api_type):
@@ -173,7 +169,7 @@ class Client:
         GET and initialize a class with a certain type
         """
         xml, response = self.request('show/' + name)
-        status = self.get_response_status(xml)
+        _ = self.get_response_status(xml)
 
         objects = []
 
@@ -194,13 +190,13 @@ class Client:
             if not os.path.isdir(self.debug_outdir):
                 os.mkdir(self.debug_outdir)
 
-            with open(os.path.join(self.debug_outdir, "show-%s.xml" % name), 'w') as fh:
+            with open(os.path.join(self.debug_outdir, "show-%s.xml" % name), mode='w', encoding='utf-8') as fh:
                 fh.write(response.text)
 
         return class_type(objects)
 
 
-class ApiObject:
+class ApiObject: # pylint: disable=too-few-public-methods
     def __init__(self, element):
         """
         Build a Python object from an XML API object element
@@ -327,9 +323,9 @@ class Disks(CheckResult):
 
             self.perfdata.append("disk_%s_temperature=%s" % (label, p['temperature-numeric']))
 
-        for state in states:
-            if states[state] != 0:
-                self.summary.append("%d %s" % (states[state], state))
+        for text, state in states.items():
+            if state != 0:
+                self.summary.append("%d %s" % (state, text))
 
         if len(self.summary) == 0:
             self.summary = ["no disks"]
@@ -374,31 +370,29 @@ def worst_state(*states):
     return overall
 
 
-def parse_args():
-    args = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+def commandline(args):
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
 
-    args.add_argument('--api', '-A', required=True,
+    parser.add_argument('--api', '-A', required=True,
         help='HP MSA host url (e.g. https://msa1.local)')
 
-    args.add_argument('--username', '-u', help='Username for login', required=True)
-    args.add_argument('--password', '-p', help='Password for login', required=True)
+    parser.add_argument('--username', '-u', help='Username for login', required=True)
+    parser.add_argument('--password', '-p', help='Password for login', required=True)
 
-    args.add_argument('--mode', '-m', help='Check mode', required=True)
+    parser.add_argument('--mode', '-m', help='Check mode', required=True)
 
-    args.add_argument('--insecure', help='Do not check certificates', action='store_true')
+    parser.add_argument('--insecure', help='Do not check certificates', action='store_true')
 
-    args.add_argument('--version', '-V', help='Print version', action='store_true')
-    args.add_argument('--auth-hash-type',
-                      help='The hash algorithm to use for the authentication procedure',
-                      required=False,
-                      choices=['md5', 'sha256'])
+    parser.add_argument('--version', '-V', help='Print version', action='store_true')
+    parser.add_argument('--auth-hash-type',
+                        help='The Hash algorithm to use for the authentication procedure',
+                        required=False,
+                        choices=['md5', 'sha256'])
 
-    return args.parse_args()
+    return parser.parse_args(args)
 
 
-def main():
-    args = parse_args()
-
+def main(args):
     if args.version:
         print("check_hp_msa version %s" % VERSION)
         return 0
@@ -418,20 +412,16 @@ def main():
     return mode.print_and_return()
 
 
-if __package__ == '__main__' or __package__ is None:
+if __name__ == '__main__': # pragma: no cover
     try:
-        sys.exit(main())
-    except CriticalException as e:
+        ARGS = commandline(sys.argv[1:])
+        sys.exit(main(ARGS))
+    except CriticalException as e: # pylint: disable=raise-missing-from
         print("[CRITICAL] " + str(e))
         sys.exit(CRITICAL)
-    except Exception:
-        exception = sys.exc_info()
-        print("[UNKNOWN] Unexpected Python error: %s %s" % (exception[0], exception[1]))
-
-        try:
-            import traceback
-            traceback.print_tb(exception[2])
-        except:
-            pass
-
-        sys.exit(UNKNOWN)
+    except SystemExit:
+        # Re-throw the exception
+        raise sys.exc_info()[1].with_traceback(sys.exc_info()[2]) # pylint: disable=raise-missing-from
+    except:
+        print("UNKNOWN - Error: %s" % (str(sys.exc_info()[1])))
+        sys.exit(3)
