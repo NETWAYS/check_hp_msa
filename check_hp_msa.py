@@ -90,7 +90,7 @@ class Client:
 
     def credential_hash(self, hash_type=None):
         """
-        Build a MD5 hashed credential built from username_password
+        Build a hashed credential built from username_password
         """
         cred = "%s_%s" % (self.username, self.password)
 
