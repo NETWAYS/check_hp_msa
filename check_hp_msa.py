@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """
-Icinga check plugin for HP MSA storages
-
-TODO
+Monitoring check plugin for HP MSA storages
 
 ---
 
