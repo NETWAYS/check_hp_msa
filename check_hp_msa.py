@@ -88,19 +88,22 @@ class Client:
 
         self.logger = logger
 
-
-    def credential_hash(self):
+    def credential_hash(self, hash_type=None):
         """
         Build a MD5 hashed credential built from username_password
         """
         cred = "%s_%s" % (self.username, self.password)
 
-        return hashlib.md5(cred.encode()).hexdigest()
+        if hash_type is None or hash_type == "md5":
+            return hashlib.md5(cred.encode()).hexdigest()
+        elif hash_type == "sha256":
+            return hashlib.sha256(cred.encode()).hexdigest()
+        else:
+            raise
 
-
-    def login(self):
+    def login(self, hash_type):
         try:
-            cred = self.credential_hash()
+            cred = self.credential_hash(hash_type)
             xml, response = self.request('login/'+cred)
 
             responseType, responseText = self.get_response_status(xml)
@@ -385,6 +388,10 @@ def parse_args():
     args.add_argument('--insecure', help='Do not check certificates', action='store_true')
 
     args.add_argument('--version', '-V', help='Print version', action='store_true')
+    args.add_argument('--authentication_hash_algo',
+                      help='The Hash algorithm to use for the authentication procedure ',
+                      required=False,
+                      choices=['md5', 'sha256'])
 
     return args.parse_args()
 
@@ -398,7 +405,7 @@ def main():
 
     client = Client(args.api, args.username, args.password, insecure=args.insecure)
 
-    client.login()
+    client.login(args.authentication_hash_algo)
 
     mode = None
 
