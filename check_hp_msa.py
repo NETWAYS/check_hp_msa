@@ -369,18 +369,26 @@ def worst_state(*states):
 
 
 def commandline(args):
+    """
+    Parse commandline arguments.
+    """
+    def environ_or_required(key):
+        return ({'default': os.environ.get(key)} if os.environ.get(key) else {'required': True})
+
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('--api', '-A', required=True,
-        help='HP MSA host url (e.g. https://msa1.local)')
-
-    parser.add_argument('--username', '-u', help='Username for login', required=True)
-    parser.add_argument('--password', '-p', help='Password for login', required=True)
+    parser.add_argument('--api', '-A',
+                        **environ_or_required('CHECK_HP_MSA_API_URL'),
+                        help='HP MSA host URL (e.g. https://msa1.local)')
+    parser.add_argument('--username', '-u',
+                        **environ_or_required('CHECK_HP_MSA_API_USER'),
+                        help='Username for login (CHECK_HP_MSA_API_USER)')
+    parser.add_argument('--password', '-p',
+                        **environ_or_required('CHECK_HP_MSA_API_PASSWORD'),
+                        help='Password for login (CHECK_HP_MSA_API_PASSWORD)')
 
     parser.add_argument('--mode', '-m', help='Check mode', required=True)
-
     parser.add_argument('--insecure', help='Do not check certificates', action='store_true')
-
     parser.add_argument('--version', '-V', help='Print version', action='store_true')
     parser.add_argument('--auth-hash-type',
                         help='The Hash algorithm to use for the authentication procedure',
