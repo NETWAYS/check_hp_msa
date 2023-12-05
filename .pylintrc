@@ -5,6 +5,7 @@ good-names=m,p,ok
 disable=fixme,
         consider-using-f-string,
         bare-except,
+        broad-exception-raised,
         import-outside-toplevel,
         import-error,
         inconsistent-return-statements,
