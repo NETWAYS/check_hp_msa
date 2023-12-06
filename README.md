@@ -4,7 +4,6 @@
 
 Icinga check plugin for HP MSA storages. Inspired by [Zabbix HPMSA Integration](https://github.com/asand3r/zbx-hpmsa).
 
-
 ## Installation
 
 The plugin requires at least Python 3.
@@ -37,15 +36,19 @@ check_hp_msa.py --help
 -h, --help            show this help message and exit
 --api API, -A API     HP MSA host url (e.g. https://msa1.local)
 --username USERNAME, -u USERNAME
-                      Username for login
+                      Username for login (CHECK_HP_MSA_API_USER)
 --password PASSWORD, -p PASSWORD
-                      Password for login
+                      Password for login (CHECK_HP_MSA_API_PASSWORD)
 --mode MODE, -m MODE  Check mode
 --insecure            Do not check certificates
 --version, -V         Print version
 --auth-hash-type {md5,sha256}
                       The Hash algorithm to use for the authentication procedure
 ```
+
+Various flags can be set with environment variables, refer to the help to see which flags.
+
+## Example
 
 ```bash
 check_hp_msa.py --api 'https://msa.local' -u icinga -p password --mode disks

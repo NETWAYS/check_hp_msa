@@ -3,6 +3,7 @@
 import unittest
 import unittest.mock as mock
 import sys
+import os
 
 sys.path.append('..')
 
@@ -36,6 +37,18 @@ class CLITesting(unittest.TestCase):
         actual = commandline(['-A', 'http://localhost', '-u', 'foo', '-p', 'bar', '-m', 'disks', '--auth-hash-type', 'md5'])
         self.assertEqual(actual.api, 'http://localhost')
         self.assertEqual(actual.auth_hash_type, 'md5')
+
+    def test_commandline_fromenv(self):
+        os.environ['CHECK_HP_MSA_API_USER'] = 'GEH'
+        os.environ['CHECK_HP_MSA_API_PASSWORD'] = 'HEIM'
+
+        actual = commandline(['-A', 'http://localhost', '-m', 'disks', '--auth-hash-type', 'md5'])
+        self.assertEqual(actual.username, 'GEH')
+        self.assertEqual(actual.password, 'HEIM')
+
+        os.unsetenv('CHECK_HP_MSA_API_USER')
+        os.unsetenv('CHECK_HP_MSA_API_PASSWORD')
+
 
 class ClientTesting(unittest.TestCase):
 
